@@ -36,18 +36,30 @@ export interface Stats {
 }
 
 async function get(action: string, params?: Record<string, string>, headers?: Record<string, string>) {
-  const q = new URLSearchParams({ action, ...params }).toString();
-  const res = await fetch(`${API_URL}?${q}`, { headers });
-  return res.json();
+  try {
+    const q = new URLSearchParams({ action, ...params }).toString();
+    const res = await fetch(`${API_URL}?${q}`, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch (e) {
+    console.error(`[api] GET ${action}:`, e);
+    return {};
+  }
 }
 
 async function post(action: string, body: object, headers?: Record<string, string>) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify({ action, ...body }),
-  });
-  return res.json();
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ action, ...body }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch (e) {
+    console.error(`[api] POST ${action}:`, e);
+    return {};
+  }
 }
 
 export const api = {
@@ -65,9 +77,9 @@ export const api = {
   toggleFavorite: (sessionId: string, stationId: number, action: 'add' | 'remove') =>
     post('favorites', { session_id: sessionId, station_id: stationId, fav_action: action }),
   adminGetStations: () =>
-    get('admin_stations', {}, { 'x-admin-token': 'admin123' }),
+    get('admin_stations', { admin_token: 'admin123' }),
   adminAddStation: (data: Partial<Station>) =>
-    post('admin_add', data, { 'x-admin-token': 'admin123' }),
+    post('admin_add', { admin_token: 'admin123', ...data }),
   adminUpdateStation: (id: number, data: Partial<Station>) =>
-    post('admin_update', { id, ...data }, { 'x-admin-token': 'admin123' }),
+    post('admin_update', { admin_token: 'admin123', id, ...data }),
 };

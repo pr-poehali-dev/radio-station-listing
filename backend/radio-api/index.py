@@ -163,7 +163,7 @@ def handler(event: dict, context) -> dict:
         
         # ADMIN: GET all stations
         if method == 'GET' and action == 'admin_stations':
-            admin_token = (event.get('headers') or {}).get('x-admin-token', '')
+            admin_token = (event.get('headers') or {}).get('x-admin-token', '') or params.get('admin_token', '')
             if admin_token != 'admin123':
                 return {'statusCode': 403, 'headers': cors_headers, 'body': json.dumps({'error': 'Forbidden'})}
             cur.execute("SELECT * FROM radio_stations ORDER BY created_at DESC")
@@ -172,18 +172,24 @@ def handler(event: dict, context) -> dict:
         
         # ADMIN: POST add station
         if method == 'POST' and action == 'admin_add':
-            admin_token = (event.get('headers') or {}).get('x-admin-token', '')
+            admin_token = (event.get('headers') or {}).get('x-admin-token', '') or body.get('admin_token', '')
             if admin_token != 'admin123':
                 return {'statusCode': 403, 'headers': cors_headers, 'body': json.dumps({'error': 'Forbidden'})}
+            def to_bool(v, default=False):
+                if isinstance(v, bool): return v
+                if isinstance(v, str): return v.lower() in ('true', '1', 'yes')
+                return default
             cur.execute("""
                 INSERT INTO radio_stations (name, genre, description, stream_url, logo_url, city, frequency, is_active, is_featured, is_recommended, listeners_count)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *
             """, (
-                body.get('name'), body.get('genre'), body.get('description'),
-                body.get('stream_url'), body.get('logo_url'), body.get('city'),
-                body.get('frequency'), body.get('is_active', True),
-                body.get('is_featured', False), body.get('is_recommended', False),
-                body.get('listeners_count', 0)
+                body.get('name'), body.get('genre') or None, body.get('description') or None,
+                body.get('stream_url'), body.get('logo_url') or None, body.get('city') or None,
+                body.get('frequency') or None,
+                to_bool(body.get('is_active'), True),
+                to_bool(body.get('is_featured'), False),
+                to_bool(body.get('is_recommended'), False),
+                int(body.get('listeners_count', 0) or 0)
             ))
             station = dict(cur.fetchone())
             conn.commit()
@@ -191,9 +197,14 @@ def handler(event: dict, context) -> dict:
         
         # ADMIN: POST update station
         if method == 'POST' and action == 'admin_update':
-            admin_token = (event.get('headers') or {}).get('x-admin-token', '')
+            admin_token = (event.get('headers') or {}).get('x-admin-token', '') or body.get('admin_token', '')
             if admin_token != 'admin123':
                 return {'statusCode': 403, 'headers': cors_headers, 'body': json.dumps({'error': 'Forbidden'})}
+            def to_bool(v, default=None):
+                if v is None: return default
+                if isinstance(v, bool): return v
+                if isinstance(v, str): return v.lower() in ('true', '1', 'yes')
+                return default
             station_id = body.get('id')
             cur.execute("""
                 UPDATE radio_stations SET
@@ -211,10 +222,13 @@ def handler(event: dict, context) -> dict:
                     updated_at = NOW()
                 WHERE id = %s RETURNING *
             """, (
-                body.get('name'), body.get('genre'), body.get('description'),
-                body.get('stream_url'), body.get('logo_url'), body.get('city'),
-                body.get('frequency'), body.get('is_active'), body.get('is_featured'),
-                body.get('is_recommended'), body.get('listeners_count'), station_id
+                body.get('name'), body.get('genre') or None, body.get('description') or None,
+                body.get('stream_url'), body.get('logo_url') or None, body.get('city') or None,
+                body.get('frequency') or None,
+                to_bool(body.get('is_active')), to_bool(body.get('is_featured')),
+                to_bool(body.get('is_recommended')),
+                int(body.get('listeners_count', 0) or 0) if body.get('listeners_count') is not None else None,
+                station_id
             ))
             station = cur.fetchone()
             conn.commit()
