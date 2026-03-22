@@ -35,47 +35,39 @@ export interface Stats {
   user_favorites: number;
 }
 
-async function request(path: string, options?: RequestInit) {
-  const res = await fetch(`${API_URL}${path}`, options);
+async function get(action: string, params?: Record<string, string>, headers?: Record<string, string>) {
+  const q = new URLSearchParams({ action, ...params }).toString();
+  const res = await fetch(`${API_URL}?${q}`, { headers });
+  return res.json();
+}
+
+async function post(action: string, body: object, headers?: Record<string, string>) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ action, ...body }),
+  });
   return res.json();
 }
 
 export const api = {
-  getStations: (params?: Record<string, string>) => {
-    const q = params ? '?' + new URLSearchParams(params).toString() : '';
-    return request(`/stations${q}`);
-  },
-  getGenres: () => request('/genres'),
-  getStats: (sessionId?: string) => {
-    const q = sessionId ? `?session_id=${sessionId}` : '';
-    return request(`/stats${q}`);
-  },
-  getHistory: (sessionId: string) => request(`/history?session_id=${sessionId}`),
+  getStations: (params?: Record<string, string>) =>
+    get('stations', params),
+  getGenres: () => get('genres'),
+  getStats: (sessionId?: string) =>
+    get('stats', sessionId ? { session_id: sessionId } : {}),
+  getHistory: (sessionId: string) =>
+    get('history', { session_id: sessionId }),
   addHistory: (sessionId: string, stationId: number, stationName: string, duration = 0) =>
-    request('/history', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId, station_id: stationId, station_name: stationName, duration_seconds: duration }),
-    }),
-  getFavorites: (sessionId: string) => request(`/favorites?session_id=${sessionId}`),
+    post('history', { session_id: sessionId, station_id: stationId, station_name: stationName, duration_seconds: duration }),
+  getFavorites: (sessionId: string) =>
+    get('favorites', { session_id: sessionId }),
   toggleFavorite: (sessionId: string, stationId: number, action: 'add' | 'remove') =>
-    request('/favorites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: sessionId, station_id: stationId, action }),
-    }),
+    post('favorites', { session_id: sessionId, station_id: stationId, fav_action: action }),
   adminGetStations: () =>
-    request('/admin/stations', { headers: { 'x-admin-token': 'admin123' } }),
+    get('admin_stations', {}, { 'x-admin-token': 'admin123' }),
   adminAddStation: (data: Partial<Station>) =>
-    request('/admin/stations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-token': 'admin123' },
-      body: JSON.stringify(data),
-    }),
+    post('admin_add', data, { 'x-admin-token': 'admin123' }),
   adminUpdateStation: (id: number, data: Partial<Station>) =>
-    request(`/admin/stations/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-admin-token': 'admin123' },
-      body: JSON.stringify(data),
-    }),
+    post('admin_update', { id, ...data }, { 'x-admin-token': 'admin123' }),
 };
